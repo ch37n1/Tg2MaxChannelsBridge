@@ -4,3 +4,4 @@ __pycache__
 links.json
 .env
 .local/
+PLAN.md
