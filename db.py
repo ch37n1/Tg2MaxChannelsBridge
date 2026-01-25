@@ -16,8 +16,10 @@ from tinydb import TinyDB, Query
 
 db = TinyDB("routes.db")
 routes_table = db.table("routes")
+admins_table = db.table("admins")
 
 Route = Query()
+Admin = Query()
 
 
 def get_all_routes() -> list[dict]:
@@ -125,3 +127,55 @@ def route_exists(tg_source_id: int, max_target_id: int) -> bool:
     return routes_table.contains(
         (Route.tg_source_id == tg_source_id) & (Route.max_target_id == max_target_id)
     )
+
+
+# --- Admin Management ---
+
+
+def get_all_admins() -> list[int]:
+    """
+    Get all admin user IDs from the database.
+
+    Returns:
+        List of admin Telegram user IDs.
+    """
+    return [admin["user_id"] for admin in admins_table.all()]
+
+
+def add_admin(user_id: int) -> int:
+    """
+    Add a new admin to the database.
+
+    Args:
+        user_id: Telegram user ID to add as admin.
+
+    Returns:
+        Document ID of the inserted admin.
+    """
+    return admins_table.insert({"user_id": user_id})
+
+
+def remove_admin(user_id: int) -> list[int]:
+    """
+    Remove an admin from the database.
+
+    Args:
+        user_id: Telegram user ID to remove.
+
+    Returns:
+        List of removed document IDs (empty if not found).
+    """
+    return admins_table.remove(Admin.user_id == user_id)
+
+
+def admin_exists(user_id: int) -> bool:
+    """
+    Check if a user is an admin in the database.
+
+    Args:
+        user_id: Telegram user ID to check.
+
+    Returns:
+        True if user is an admin, False otherwise.
+    """
+    return admins_table.contains(Admin.user_id == user_id)
