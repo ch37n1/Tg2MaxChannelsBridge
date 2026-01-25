@@ -5,3 +5,4 @@ links.json
 .env
 .local/
 PLAN.md
+routes.db
