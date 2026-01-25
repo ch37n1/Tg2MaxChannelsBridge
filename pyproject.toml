@@ -9,4 +9,5 @@ dependencies = [
     "aiohttp>=3.13.3",
     "maxapi>=0.9.12",
     "python-dotenv>=1.2.1",
+    "tinydb>=4.8.2",
 ]
