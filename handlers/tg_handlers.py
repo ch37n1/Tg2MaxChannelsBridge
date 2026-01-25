@@ -4,7 +4,7 @@ import os
 import tempfile
 
 from aiogram import F
-from aiogram.types import Message as TgMessage
+from aiogram.types import Message as TgMessage, Update as TgUpdate
 from maxapi.types import InputMedia
 
 import config
@@ -12,7 +12,7 @@ from loader import tg_dp, tg_bot, max_bot
 
 media_groups = {}
 
-async def send_media_group(media_group_id: str):
+async def forward_media_group(media_group_id: str, max_channel_id: int):
     """
     Отправляет сгруппированные медиафайлы в MAX.
     """
@@ -50,7 +50,7 @@ async def send_media_group(media_group_id: str):
                 
         if attachments:
             await max_bot.send_message(
-                chat_id=config.MAX_CHANNEL_ID,
+                chat_id=max_channel_id,
                 text=text,
                 attachments=attachments
             )
@@ -68,29 +68,21 @@ async def send_media_group(media_group_id: str):
                     logging.error(f"Error removing temp file {path}: {e}")
 
 
-@tg_dp.channel_post(F.chat.id == config.TG_CHANNEL_ID)
-async def on_channel_post(message: TgMessage):
-    """
-    Обрабатывает новые посты в Telegram канале и пересылает их в MAX.
-    """
-    logging.info(f"New post in Telegram channel {message.chat.id}: {message.message_id}")
-    
-    # Если это группа медиа
-    if message.media_group_id:
-        if message.media_group_id not in media_groups:
-            media_groups[message.media_group_id] = []
-            asyncio.create_task(send_media_group(message.media_group_id))
-            
-        media_groups[message.media_group_id].append(message)
-        return
+async def handle_media_group(tg_message: TgMessage, max_channel_id: int):
+    if tg_message.media_group_id not in media_groups:
+        media_groups[tg_message.media_group_id] = []
+        asyncio.create_task(forward_media_group(tg_message.media_group_id, max_channel_id))
+        
+    media_groups[tg_message.media_group_id].append(tg_message)
 
+async def handle_single(tg_message: TgMessage, max_channel_id: int):
     # Обычная обработка одиночных сообщений
-    text = message.text or message.caption or ""
-    
+    text = tg_message.text or tg_message.caption or ""
+
     # Обработка фото
-    if message.photo:
+    if tg_message.photo:
         # Берем фото самого лучшего качества
-        photo = message.photo[-1]
+        photo = tg_message.photo[-1]
         file_info = await tg_bot.get_file(photo.file_id)
         file_path = file_info.file_path
         
@@ -104,7 +96,7 @@ async def on_channel_post(message: TgMessage):
             # Отправляем в MAX
             media = InputMedia(temp_path)
             await max_bot.send_message(
-                chat_id=config.MAX_CHANNEL_ID,
+                chat_id=max_channel_id,
                 text=text,
                 attachments=[media]
             )
@@ -120,9 +112,34 @@ async def on_channel_post(message: TgMessage):
     elif text:
         try:
             await max_bot.send_message(
-                chat_id=config.MAX_CHANNEL_ID,
+                chat_id=max_channel_id,
                 text=text
             )
             logging.info("Forwarded text to MAX")
         except Exception as e:
             logging.error(f"Error forwarding text: {e}")
+
+@tg_dp.channel_post()
+async def on_channel_post(message: TgMessage):
+    """
+    Обрабатывает новые посты в Telegram канале и пересылает их в MAX.
+    """
+    logging.info(f"New post in Telegram channel {message.chat.id}: {message.message_id}")
+
+    target_max_ids = config.CHANNEL_LINKS.get(message.chat.id)
+    if not target_max_ids:
+        logging.info(f"No targets found for Telegram channel {message.chat.id}")
+        return
+
+    for max_id in target_max_ids:
+        # Не asyncio.gather(), чтоб не спамить
+
+        # Если это группа медиа
+        if message.media_group_id:
+            await handle_media_group(message, max_id)
+            return
+
+        await handle_single(message, max_id)
+
+        await asyncio.sleep(1)
+
