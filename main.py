@@ -4,10 +4,12 @@ import signal
 import os
 
 from loader import tg_dp, tg_bot
+import handlers.admin_handlers
 import handlers.max_handlers
 import handlers.tg_handlers
 
 _ = (
+    handlers.admin_handlers,
     handlers.max_handlers,
     handlers.tg_handlers,
 )
