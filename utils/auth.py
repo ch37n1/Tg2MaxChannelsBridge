@@ -8,11 +8,20 @@ from typing import Callable, Awaitable
 from aiogram.types import Message as TgMessage
 
 import config
+import db
 
 
 def is_admin(user_id: int) -> bool:
-    """Check if user ID is in admin whitelist."""
-    return user_id in config.ADMIN_IDS
+    """
+    Check if user ID is an admin.
+
+    Checks env admins first (always have access), then checks DB.
+    """
+    # Check env admins first (always have access)
+    if user_id in config.ADMIN_IDS:
+        return True
+    # Then check DB
+    return db.admin_exists(user_id)
 
 
 def admin_only(handler: Callable[[TgMessage], Awaitable[None]]):
