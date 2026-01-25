@@ -10,15 +10,14 @@ TODO:
     - [x] Message.audio > send with same file extension and text
     - [x] Message.document > send with same file extension and text
     - [x] Message.video > send with same file extension and text
-- [ ] Not support:
-    - Message.sticker > skip
-    - Message.voice > skip
-    - Message.checklist > skip
-    - Message.contact > skip
-    - Message.dice > skip
-    - Message.game > skip
-    - Message.poll > skip
-    - Message.location > skip
+- [x] Not support (skip):
+    - [x] Message.sticker > skip
+    - [x] Message.voice > skip
+    - [x] Message.contact > skip
+    - [x] Message.dice > skip
+    - [x] Message.game > skip
+    - [x] Message.poll > skip
+    - [x] Message.location > skip
 
 Aiogram Doc is here:
 https://docs.aiogram.dev/en/v3.24.0

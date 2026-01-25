@@ -149,6 +149,30 @@ async def handle_media_group(tg_message: TgMessage, max_channel_id: int):
 
 async def handle_single(tg_message: TgMessage, max_channel_id: int):
     """Handle single messages (photo, audio, document, video, or text)."""
+    
+    # Skip unsupported message types
+    if tg_message.sticker:
+        logging.debug("Skipping sticker message")
+        return
+    if tg_message.voice:
+        logging.debug("Skipping voice message")
+        return
+    if tg_message.contact:
+        logging.debug("Skipping contact message")
+        return
+    if tg_message.dice:
+        logging.debug("Skipping dice message")
+        return
+    if tg_message.game:
+        logging.debug("Skipping game message")
+        return
+    if tg_message.poll:
+        logging.debug("Skipping poll message")
+        return
+    if tg_message.location:
+        logging.debug("Skipping location message")
+        return
+    
     text = tg_message.text or tg_message.caption or ""
 
     # Photo
