@@ -14,19 +14,22 @@ _ = (
 
 logging.basicConfig(level=logging.INFO)
 
+
 def force_exit(signum, frame):
     logging.info("Received interrupt signal, forcing exit...")
     os._exit(0)
 
+
 async def main():
     logging.info("Starting bots...")
-    
+
     # Register signal handlers
     signal.signal(signal.SIGINT, force_exit)
     signal.signal(signal.SIGTERM, force_exit)
-    
+
     # Run telegram bot in main thread
     await tg_dp.start_polling(tg_bot)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     asyncio.run(main())
