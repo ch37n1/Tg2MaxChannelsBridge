@@ -10,9 +10,10 @@ from aiogram import F
 from aiogram.filters import Command
 from aiogram.types import Message as TgMessage, BufferedInputFile
 
+import config
 import db
 from loader import tg_dp, tg_bot, max_bot
-from utils.auth import admin_only
+from utils.auth import admin_only, is_admin
 from utils.resolvers import resolve_tg_chat, resolve_max_chat, ResolveError
 
 
@@ -25,10 +26,17 @@ HELP_TEXT = """Bot Admin Commands:
 /import - Import routes from CSV (send file with this caption)
 /export - Export all routes to CSV
 
+Admin Management:
+/admins - List all admin user IDs
+/addadmin <user_id> - Add a new admin by user ID
+/removeadmin <user_id> - Remove an admin by user ID
+
 Examples:
   /add @my_channel https://max.ru/target
   /add -1001234567890 -69520134802093
-  /remove @my_channel https://max.ru/target"""
+  /remove @my_channel https://max.ru/target
+  /addadmin 123456789
+  /removeadmin 123456789"""
 
 
 @tg_dp.message(Command("help"))
@@ -263,3 +271,103 @@ async def handle_export(message: TgMessage):
     # Send as document
     document = BufferedInputFile(csv_content, filename="routes.csv")
     await message.reply_document(document, caption=f"Exported {len(routes)} route(s)")
+
+
+@tg_dp.message(Command("admins"))
+@admin_only
+async def handle_admins(message: TgMessage):
+    """List all admin user IDs."""
+    env_admins = sorted(config.ADMIN_IDS)
+    db_admins = sorted(db.get_all_admins())
+
+    lines = []
+
+    if env_admins:
+        lines.append("Admins from env:")
+        for uid in env_admins:
+            lines.append(f"  {uid}")
+    else:
+        lines.append("Admins from env: (none)")
+
+    lines.append("")
+
+    if db_admins:
+        lines.append("Admins from DB:")
+        for uid in db_admins:
+            lines.append(f"  {uid}")
+    else:
+        lines.append("Admins from DB: (none)")
+
+    total = len(env_admins) + len(db_admins)
+    lines.append("")
+    lines.append(f"Total: {total} admin(s)")
+
+    await message.reply("\n".join(lines))
+
+
+@tg_dp.message(Command("addadmin"))
+@admin_only
+async def handle_addadmin(message: TgMessage):
+    """Add a new admin by user ID."""
+    if not message.text:
+        return
+
+    # Parse arguments
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.reply("Usage: /addadmin <user_id>\n\nExample: /addadmin 123456789")
+        return
+
+    # Parse user_id
+    try:
+        user_id = int(parts[1].strip())
+    except ValueError:
+        await message.reply("Invalid user ID. Must be an integer.")
+        return
+
+    # Check if already admin (env or DB)
+    if user_id in config.ADMIN_IDS:
+        await message.reply(f"User {user_id} is already an env admin.")
+        return
+
+    if db.admin_exists(user_id):
+        await message.reply(f"User {user_id} is already a DB admin.")
+        return
+
+    # Add to DB
+    db.add_admin(user_id)
+    await message.reply(f"Added admin: {user_id}")
+
+
+@tg_dp.message(Command("removeadmin"))
+@admin_only
+async def handle_removeadmin(message: TgMessage):
+    """Remove an admin by user ID."""
+    if not message.text:
+        return
+
+    # Parse arguments
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+        await message.reply("Usage: /removeadmin <user_id>\n\nExample: /removeadmin 123456789")
+        return
+
+    # Parse user_id
+    try:
+        user_id = int(parts[1].strip())
+    except ValueError:
+        await message.reply("Invalid user ID. Must be an integer.")
+        return
+
+    # Check if it's an env admin
+    if user_id in config.ADMIN_IDS:
+        await message.reply(f"Cannot remove env admin: {user_id}")
+        return
+
+    # Remove from DB
+    removed = db.remove_admin(user_id)
+
+    if removed:
+        await message.reply(f"Removed admin: {user_id}")
+    else:
+        await message.reply(f"Admin not found: {user_id}")
