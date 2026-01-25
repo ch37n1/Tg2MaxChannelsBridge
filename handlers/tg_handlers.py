@@ -3,8 +3,7 @@ import logging
 import os
 import tempfile
 
-from aiogram import F
-from aiogram.types import Message as TgMessage, Update as TgUpdate
+from aiogram.types import Message as TgMessage
 from maxapi.types import InputMedia
 
 import config
@@ -40,10 +39,15 @@ async def forward_media_group(media_group_id: str, max_channel_id: int):
             if m.photo:
                 photo = m.photo[-1]
                 file_info = await tg_bot.get_file(photo.file_id)
-                
+ 
+                if not file_info.file_path:
+                    logging.error(f'Bad file {file_info}')
+                    continue
+
                 fd, temp_path = tempfile.mkstemp(suffix='.jpg')
                 os.close(fd)
                 temp_files.append(temp_path)
+
                 
                 await tg_bot.download_file(file_info.file_path, destination=temp_path)
                 attachments.append(InputMedia(temp_path))
@@ -69,7 +73,7 @@ async def forward_media_group(media_group_id: str, max_channel_id: int):
 
 
 async def handle_media_group(tg_message: TgMessage, max_channel_id: int):
-    if tg_message.media_group_id not in media_groups:
+    if tg_message.media_group_id and tg_message.media_group_id not in media_groups:
         media_groups[tg_message.media_group_id] = []
         asyncio.create_task(forward_media_group(tg_message.media_group_id, max_channel_id))
         
@@ -85,7 +89,10 @@ async def handle_single(tg_message: TgMessage, max_channel_id: int):
         photo = tg_message.photo[-1]
         file_info = await tg_bot.get_file(photo.file_id)
         file_path = file_info.file_path
-        
+        if not file_path:
+            logging.error(f'Bad file {file_info}')
+            return
+
         # Скачиваем файл
         fd, temp_path = tempfile.mkstemp(suffix='.jpg')
         os.close(fd) 
@@ -125,6 +132,8 @@ async def on_channel_post(message: TgMessage):
     Обрабатывает новые посты в Telegram канале и пересылает их в MAX.
     """
     logging.info(f"New post in Telegram channel {message.chat.id}: {message.message_id}")
+
+    logging.info(f'FULL: {message}')
 
     target_max_ids = config.CHANNEL_LINKS.get(message.chat.id)
     if not target_max_ids:
