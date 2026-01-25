@@ -13,7 +13,6 @@ _ = (
     handlers.tg_handlers,
 )
 
-
 logging.basicConfig(level=logging.INFO)
 
 def force_exit(signum, frame):
