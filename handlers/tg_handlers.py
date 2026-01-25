@@ -59,6 +59,7 @@ async def send_to_max(
         True if sent successfully, False otherwise.
     """
     attachments: list = [InputMedia(path) for path in temp_paths]
+    # Max сам понимает тип файла по mime_type, например mime_type.startswith("video/") 
     
     try:
         await max_bot.send_message(

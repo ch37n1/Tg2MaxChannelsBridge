@@ -4,7 +4,7 @@
 Простейшая система форвардинга между телегой и максом на Bot API с обоих сторон и routes.json для маршрутизации. Поддерживает передачу медиагрупп. Это форк.
 
 TODO:
-- [ ] refactor to have `send_photo` method instead of code duplicates
+- [x] refactor to have `send_photo` method instead of code duplicates
 - [ ] Support
     - [ ] Message.photo >  send with same file extension and text (now 
     - [ ] Message.audio >  send with same file extension and text
