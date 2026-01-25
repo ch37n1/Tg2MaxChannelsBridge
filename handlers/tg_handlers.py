@@ -14,13 +14,14 @@ media_groups = {}
 
 # ============ Helper Functions ============
 
-async def download_tg_media(file_id: str, suffix: str = '.jpg') -> str | None:
+async def download_tg_media(file_id: str, default_suffix: str = '.bin') -> str | None:
     """
     Download any media from Telegram and save to temp file.
+    Extension is auto-detected from file_path when possible.
     
     Args:
         file_id: Telegram file_id for the media
-        suffix: File extension (e.g., '.jpg', '.mp4', '.mp3', '.pdf')
+        default_suffix: Fallback extension if auto-detection fails
     
     Returns:
         Temp file path, or None if download failed.
@@ -31,6 +32,10 @@ async def download_tg_media(file_id: str, suffix: str = '.jpg') -> str | None:
         if not file_info.file_path:
             logging.error(f'Could not get file path for file_id {file_id}')
             return None
+
+        # Extract extension from Telegram's file_path, fallback to default
+        _, ext = os.path.splitext(file_info.file_path)
+        suffix = ext if ext else default_suffix
 
         fd, temp_path = tempfile.mkstemp(suffix=suffix)
         os.close(fd)
@@ -107,12 +112,21 @@ async def forward_media_group(media_group_id: str, max_channel_id: int):
             text = caption
             break
             
-    # Download all photos
+    # Download all media (photos and videos)
     temp_files = []
     for m in messages:
+        file_id = None
+        default_suffix = '.bin'
+        
         if m.photo:
-            photo = m.photo[-1]  # Best quality
-            temp_path = await download_tg_media(photo.file_id, suffix='.jpg')
+            file_id = m.photo[-1].file_id  # Best quality
+            default_suffix = '.jpg'
+        elif m.video:
+            file_id = m.video.file_id
+            default_suffix = '.mp4'
+        
+        if file_id:
+            temp_path = await download_tg_media(file_id, default_suffix=default_suffix)
             if temp_path:
                 temp_files.append(temp_path)
                 
@@ -134,25 +148,46 @@ async def handle_media_group(tg_message: TgMessage, max_channel_id: int):
     media_groups[tg_message.media_group_id].append(tg_message)
 
 async def handle_single(tg_message: TgMessage, max_channel_id: int):
-    """Обработка одиночных сообщений (фото или текст)."""
+    """Handle single messages (photo, audio, document, video, or text)."""
     text = tg_message.text or tg_message.caption or ""
 
-    # Обработка фото
+    # Photo
     if tg_message.photo:
         photo = tg_message.photo[-1]  # Best quality
-        temp_path = await download_tg_media(photo.file_id, suffix='.jpg')
-        if not temp_path:
-            return
-        
-        success = await send_to_max(max_channel_id, text, [temp_path])
-        if success:
+        temp_path = await download_tg_media(photo.file_id, default_suffix='.jpg')
+        if temp_path:
+            await send_to_max(max_channel_id, text, [temp_path])
             logging.info("Forwarded photo to MAX")
-                
-    # Обработка только текста
-    elif text:
-        success = await send_to_max(max_channel_id, text, [])
-        if success:
-            logging.info("Forwarded text to MAX")
+        return
+
+    # Audio
+    if tg_message.audio:
+        temp_path = await download_tg_media(tg_message.audio.file_id, default_suffix='.mp3')
+        if temp_path:
+            await send_to_max(max_channel_id, text, [temp_path])
+            logging.info("Forwarded audio to MAX")
+        return
+
+    # Document
+    if tg_message.document:
+        temp_path = await download_tg_media(tg_message.document.file_id, default_suffix='.bin')
+        if temp_path:
+            await send_to_max(max_channel_id, text, [temp_path])
+            logging.info("Forwarded document to MAX")
+        return
+
+    # Video
+    if tg_message.video:
+        temp_path = await download_tg_media(tg_message.video.file_id, default_suffix='.mp4')
+        if temp_path:
+            await send_to_max(max_channel_id, text, [temp_path])
+            logging.info("Forwarded video to MAX")
+        return
+
+    # Text only
+    if text:
+        await send_to_max(max_channel_id, text, [])
+        logging.info("Forwarded text to MAX")
 
 @tg_dp.channel_post()
 async def on_channel_post(message: TgMessage):

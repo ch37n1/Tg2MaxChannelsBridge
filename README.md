@@ -5,11 +5,11 @@
 
 TODO:
 - [x] refactor to have `send_photo` method instead of code duplicates
-- [ ] Support
-    - [ ] Message.photo >  send with same file extension and text (now 
-    - [ ] Message.audio >  send with same file extension and text
-    - [ ] Message.document > send with same file extension and text
-    - [ ] Message.video > send with same file extension and text
+- [x] Support
+    - [x] Message.photo > send with same file extension and text
+    - [x] Message.audio > send with same file extension and text
+    - [x] Message.document > send with same file extension and text
+    - [x] Message.video > send with same file extension and text
 - [ ] Not support:
     - Message.sticker > skip
     - Message.voice > skip
