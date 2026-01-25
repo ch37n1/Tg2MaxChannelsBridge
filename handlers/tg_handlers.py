@@ -6,7 +6,7 @@ import tempfile
 from aiogram.types import Message as TgMessage
 from maxapi.types import InputMedia
 
-import config
+import db
 from loader import tg_dp, tg_bot, max_bot
 
 media_groups = {}
@@ -236,7 +236,7 @@ async def on_channel_post(message: TgMessage):
 
     logging.info(f"FULL: {message}")
 
-    target_max_ids = config.CHANNEL_LINKS.get(message.chat.id)
+    target_max_ids = db.get_channel_links().get(message.chat.id)
     if not target_max_ids:
         logging.info(f"No targets found for Telegram channel {message.chat.id}")
         return
