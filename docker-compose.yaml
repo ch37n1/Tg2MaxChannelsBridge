@@ -1,0 +1,26 @@
+name: tg2max
+
+networks:
+  tg2max:
+    driver: bridge
+
+services:
+  tg2max_server:
+    container_name: tg2max_server 
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+      cache_from:
+        - type=local,src=.buildx-cache
+      cache_to:
+        - type=local,dest=.buildx-cache,mode=max
+    image: tg2max_server
+    env_file:
+      - ./.env
+    stop_signal: SIGINT
+    stop_grace_period: 5s
+    restart: unless-stopped
+    mem_limit: 2g
+    networks:
+      - tg2max
+

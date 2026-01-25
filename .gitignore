@@ -1,4 +1,5 @@
 venv/
+.buildx-cache
 __pycache__
 links.json
 .env
