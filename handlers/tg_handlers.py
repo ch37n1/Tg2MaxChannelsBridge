@@ -11,6 +11,81 @@ from loader import tg_dp, tg_bot, max_bot
 
 media_groups = {}
 
+
+# ============ Helper Functions ============
+
+async def download_tg_media(file_id: str, suffix: str = '.jpg') -> str | None:
+    """
+    Download any media from Telegram and save to temp file.
+    
+    Args:
+        file_id: Telegram file_id for the media
+        suffix: File extension (e.g., '.jpg', '.mp4', '.mp3', '.pdf')
+    
+    Returns:
+        Temp file path, or None if download failed.
+        Caller is responsible for cleanup.
+    """
+    try:
+        file_info = await tg_bot.get_file(file_id)
+        if not file_info.file_path:
+            logging.error(f'Could not get file path for file_id {file_id}')
+            return None
+
+        fd, temp_path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+
+        await tg_bot.download_file(file_info.file_path, destination=temp_path)
+        return temp_path
+    except Exception as e:
+        logging.error(f"Error downloading media {file_id}: {e}")
+        return None
+
+
+async def send_to_max(
+    max_channel_id: int,
+    text: str | None,
+    temp_paths: list[str]
+) -> bool:
+    """
+    Send attachments to a Max channel and cleanup temp files.
+    
+    Args:
+        max_channel_id: Target Max channel ID
+        text: Message text/caption (can be None or empty)
+        temp_paths: List of temp file paths to attach
+    
+    Returns:
+        True if sent successfully, False otherwise.
+    """
+    attachments: list = [InputMedia(path) for path in temp_paths]
+    
+    try:
+        await max_bot.send_message(
+            chat_id=max_channel_id,
+            text=text or "",
+            attachments=attachments if attachments else None
+        )
+        return True
+    except Exception as e:
+        logging.error(f"Error sending to Max channel {max_channel_id}: {e}")
+        return False
+    finally:
+        cleanup_temp_files(temp_paths)
+
+
+def cleanup_temp_files(temp_paths: list[str]) -> None:
+    """Remove temporary files, logging any errors."""
+    for path in temp_paths:
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except Exception as e:
+                logging.error(f"Error removing temp file {path}: {e}")
+
+
+# ============ Media Group Handling ============
+
 async def forward_media_group(media_group_id: str, max_channel_id: int):
     """
     Отправляет сгруппированные медиафайлы в MAX.
@@ -31,45 +106,23 @@ async def forward_media_group(media_group_id: str, max_channel_id: int):
             text = caption
             break
             
+    # Download all photos
     temp_files = []
-    attachments = []
-    
-    try:
-        for m in messages:
-            if m.photo:
-                photo = m.photo[-1]
-                file_info = await tg_bot.get_file(photo.file_id)
- 
-                if not file_info.file_path:
-                    logging.error(f'Bad file {file_info}')
-                    continue
-
-                fd, temp_path = tempfile.mkstemp(suffix='.jpg')
-                os.close(fd)
+    for m in messages:
+        if m.photo:
+            photo = m.photo[-1]  # Best quality
+            temp_path = await download_tg_media(photo.file_id, suffix='.jpg')
+            if temp_path:
                 temp_files.append(temp_path)
-
                 
-                await tg_bot.download_file(file_info.file_path, destination=temp_path)
-                attachments.append(InputMedia(temp_path))
-                
-        if attachments:
-            await max_bot.send_message(
-                chat_id=max_channel_id,
-                text=text,
-                attachments=attachments
-            )
-            logging.info(f"Forwarded media group {media_group_id} with {len(attachments)} items to MAX")
-            
-    except Exception as e:
-        logging.error(f"Error forwarding media group {media_group_id}: {e}")
-    finally:
-        # Чистим временные файлы
-        for path in temp_files:
-            if os.path.exists(path):
-                try:
-                    os.remove(path)
-                except Exception as e:
-                    logging.error(f"Error removing temp file {path}: {e}")
+    if not temp_files:
+        logging.warning(f"No media downloaded for media group {media_group_id}")
+        return
+    
+    # Send to Max (cleanup handled inside send_to_max)
+    success = await send_to_max(max_channel_id, text, temp_files)
+    if success:
+        logging.info(f"Forwarded media group {media_group_id} with {len(temp_files)} items to MAX")
 
 
 async def handle_media_group(tg_message: TgMessage, max_channel_id: int):
@@ -80,51 +133,25 @@ async def handle_media_group(tg_message: TgMessage, max_channel_id: int):
     media_groups[tg_message.media_group_id].append(tg_message)
 
 async def handle_single(tg_message: TgMessage, max_channel_id: int):
-    # Обычная обработка одиночных сообщений
+    """Обработка одиночных сообщений (фото или текст)."""
     text = tg_message.text or tg_message.caption or ""
 
     # Обработка фото
     if tg_message.photo:
-        # Берем фото самого лучшего качества
-        photo = tg_message.photo[-1]
-        file_info = await tg_bot.get_file(photo.file_id)
-        file_path = file_info.file_path
-        if not file_path:
-            logging.error(f'Bad file {file_info}')
+        photo = tg_message.photo[-1]  # Best quality
+        temp_path = await download_tg_media(photo.file_id, suffix='.jpg')
+        if not temp_path:
             return
-
-        # Скачиваем файл
-        fd, temp_path = tempfile.mkstemp(suffix='.jpg')
-        os.close(fd) 
         
-        try:
-            await tg_bot.download_file(file_path, destination=temp_path)
-            
-            # Отправляем в MAX
-            media = InputMedia(temp_path)
-            await max_bot.send_message(
-                chat_id=max_channel_id,
-                text=text,
-                attachments=[media]
-            )
+        success = await send_to_max(max_channel_id, text, [temp_path])
+        if success:
             logging.info("Forwarded photo to MAX")
-            
-        except Exception as e:
-            logging.error(f"Error forwarding photo: {e}")
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
                 
     # Обработка только текста
     elif text:
-        try:
-            await max_bot.send_message(
-                chat_id=max_channel_id,
-                text=text
-            )
+        success = await send_to_max(max_channel_id, text, [])
+        if success:
             logging.info("Forwarded text to MAX")
-        except Exception as e:
-            logging.error(f"Error forwarding text: {e}")
 
 @tg_dp.channel_post()
 async def on_channel_post(message: TgMessage):
