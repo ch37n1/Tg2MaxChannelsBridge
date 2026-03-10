@@ -10,6 +10,7 @@ venv/
 .venv/
 env/
 ENV/
+.buildx-cache/
 
 # IDE
 .vscode/

@@ -6,7 +6,7 @@ networks:
 
 services:
   tg2max_server:
-    container_name: un000nu/tg2max_server 
+    container_name: tg2max
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -14,7 +14,7 @@ services:
         - type=local,src=.buildx-cache
       cache_to:
         - type=local,dest=.buildx-cache,mode=max
-    image: tg2max_server
+    image: un000nu/tg2max
     env_file:
       - ./.env
     environment:
