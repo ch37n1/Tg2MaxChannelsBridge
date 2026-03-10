@@ -1,7 +1,7 @@
 u:
 	uv run main.py
 
-db:
+b:
 	docker compose build
 
 du:
@@ -9,6 +9,9 @@ du:
 
 dd:
 	docker compose down
+
+p:
+	docker compose push
 
 l:
 	clear

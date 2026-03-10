@@ -10,11 +10,15 @@ DB Schema:
 }
 """
 
+import os
 from collections import defaultdict
+from pathlib import Path
 
 from tinydb import TinyDB, Query
 
-db = TinyDB("routes.db")
+db_path = Path(os.getenv("DB_PATH", "routes.db"))
+db_path.parent.mkdir(parents=True, exist_ok=True)
+db = TinyDB(db_path)
 routes_table = db.table("routes")
 admins_table = db.table("admins")
 

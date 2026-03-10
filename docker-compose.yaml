@@ -6,7 +6,7 @@ networks:
 
 services:
   tg2max_server:
-    container_name: tg2max_server 
+    container_name: un000nu/tg2max_server 
     build:
       context: .
       dockerfile: ./Dockerfile
@@ -17,10 +17,13 @@ services:
     image: tg2max_server
     env_file:
       - ./.env
+    environment:
+      DB_PATH: /data/routes.db
     stop_signal: SIGINT
     stop_grace_period: 5s
     restart: unless-stopped
     mem_limit: 2g
+    volumes:
+      - ./local/data:/data
     networks:
       - tg2max
-
