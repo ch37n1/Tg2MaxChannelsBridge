@@ -5,7 +5,7 @@ ID/Nick resolution utilities for Telegram and Max chats.
 import re
 
 from aiogram import Bot as TgBot
-from maxapi import Bot as MaxBot
+from utils.max_bot import MaxBot
 
 
 class ResolveError(Exception):
@@ -64,20 +64,13 @@ async def resolve_max_chat(bot: MaxBot, input_str: str) -> tuple[str, int]:
         chat_id = int(input_str)
         return (input_str, chat_id)
 
-    # Normalize URL: prepend https:// if missing
-    url = input_str
-    if not url.startswith("https://"):
-        if url.startswith("http://"):
-            url = "https://" + url[7:]
-        elif url.startswith("max.ru/"):
-            url = "https://" + url
-        # else assume it's already a full https URL or will fail
+    url = bot.normalize_chat_link(input_str)
 
     # Store display as full https URL
     display = url
 
     try:
-        chat = await bot.get_chat_by_link(url)
+        chat = await bot.get_chat(url)
         return (display, chat.chat_id)
     except Exception as e:
         raise ResolveError(f"Failed to resolve Max chat '{input_str}': {e}")
