@@ -9,8 +9,7 @@ import time
 from functools import lru_cache
 from typing import Any
 
-from maxapi import Bot as BaseMaxBot
-from maxapi.types.chats import Chat, Chats
+from utils.maxapi_compat import BaseMaxBot, Chat, Chats
 
 
 CHAT_CACHE_TTL_SECONDS = 600

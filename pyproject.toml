@@ -11,3 +11,19 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "tinydb>=4.8.2",
 ]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["db", "handlers", "utils"]
+
+[tool.coverage.report]
+fail_under = 90
+show_missing = true

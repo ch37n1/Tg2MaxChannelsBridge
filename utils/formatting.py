@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from aiogram.enums import MessageEntityType
 from aiogram.types import Message as TgMessage, MessageEntity
 from aiogram.utils.text_decorations import HtmlDecoration, TextDecoration
-from maxapi.enums.parse_mode import ParseMode
+from utils.maxapi_compat import ParseMode
 
 
 @dataclass(frozen=True)

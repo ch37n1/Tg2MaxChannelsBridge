@@ -6,8 +6,10 @@ from unittest.mock import AsyncMock
 
 from aiogram.enums import ChatMemberStatus, ChatType
 
+from utils.max_bot import MaxBot
 from utils.resolvers import (
     ResolveError,
+    resolve_max_chat,
     resolve_tg_chat,
     resolve_tg_forward_source,
     validate_tg_channel_access,
@@ -15,6 +17,25 @@ from utils.resolvers import (
 
 
 class TelegramResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_resolve_tg_chat_resolves_username_via_api(self) -> None:
+        bot = SimpleNamespace(
+            get_chat=AsyncMock(return_value=SimpleNamespace(id=-100123)),
+        )
+
+        display, chat_id = await resolve_tg_chat(bot, "  @example_channel  ")
+
+        self.assertEqual(display, "@example_channel")
+        self.assertEqual(chat_id, -100123)
+        bot.get_chat.assert_awaited_once_with("@example_channel")
+
+    async def test_resolve_tg_chat_wraps_api_errors(self) -> None:
+        bot = SimpleNamespace(
+            get_chat=AsyncMock(side_effect=Exception("chat not found")),
+        )
+
+        with self.assertRaisesRegex(ResolveError, "Failed to resolve Telegram chat"):
+            await resolve_tg_chat(bot, " @missing ")
+
     async def test_validate_tg_channel_access_accepts_admin_channel(self) -> None:
         bot = SimpleNamespace(
             get_chat=AsyncMock(
@@ -42,6 +63,18 @@ class TelegramResolverTests(unittest.IsolatedAsyncioTestCase):
         )
 
         with self.assertRaisesRegex(ResolveError, "is not a channel"):
+            await validate_tg_channel_access(bot, -100123, bot_user_id=77)
+
+        bot.get_chat_member.assert_not_called()
+
+    async def test_validate_tg_channel_access_rejects_inaccessible_chat(self) -> None:
+        bot = SimpleNamespace(
+            get_chat=AsyncMock(side_effect=Exception("forbidden")),
+            get_chat_member=AsyncMock(),
+            get_me=AsyncMock(),
+        )
+
+        with self.assertRaisesRegex(ResolveError, "Bot has no access"):
             await validate_tg_channel_access(bot, -100123, bot_user_id=77)
 
         bot.get_chat_member.assert_not_called()
@@ -75,6 +108,35 @@ class TelegramResolverTests(unittest.IsolatedAsyncioTestCase):
 
         bot.get_me.assert_awaited_once_with()
         bot.get_chat_member.assert_awaited_once_with(-100123, 77)
+
+    async def test_validate_tg_channel_access_wraps_get_me_errors(self) -> None:
+        bot = SimpleNamespace(
+            get_chat=AsyncMock(
+                return_value=SimpleNamespace(type=ChatType.CHANNEL),
+            ),
+            get_chat_member=AsyncMock(),
+            get_me=AsyncMock(side_effect=Exception("bad token")),
+        )
+
+        with self.assertRaisesRegex(ResolveError, "Failed to verify Telegram bot identity"):
+            await validate_tg_channel_access(bot, -100123)
+
+        bot.get_chat_member.assert_not_called()
+
+    async def test_validate_tg_channel_access_wraps_chat_member_errors(self) -> None:
+        bot = SimpleNamespace(
+            get_chat=AsyncMock(
+                return_value=SimpleNamespace(type=ChatType.CHANNEL),
+            ),
+            get_chat_member=AsyncMock(side_effect=Exception("forbidden")),
+            get_me=AsyncMock(),
+        )
+
+        with self.assertRaisesRegex(
+            ResolveError,
+            "Failed to verify bot access to Telegram channel",
+        ):
+            await validate_tg_channel_access(bot, -100123, bot_user_id=77)
 
     async def test_resolve_tg_forward_source_checks_public_channel_access(self) -> None:
         bot = SimpleNamespace(
@@ -113,6 +175,18 @@ class TelegramResolverTests(unittest.IsolatedAsyncioTestCase):
 
         bot.get_chat_member.assert_not_called()
 
+    async def test_resolve_tg_forward_source_wraps_public_lookup_errors(self) -> None:
+        bot = SimpleNamespace(
+            get_chat=AsyncMock(side_effect=Exception("chat not found")),
+            get_chat_member=AsyncMock(),
+            get_me=AsyncMock(),
+        )
+
+        with self.assertRaisesRegex(ResolveError, "Failed to resolve Telegram chat"):
+            await resolve_tg_forward_source(bot, "@missing", bot_user_id=77)
+
+        bot.get_chat_member.assert_not_called()
+
     async def test_numeric_resolve_stays_permissive_for_remove_flow(self) -> None:
         bot = SimpleNamespace(get_chat=AsyncMock())
 
@@ -121,6 +195,41 @@ class TelegramResolverTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(display, "-100123")
         self.assertEqual(chat_id, -100123)
         bot.get_chat.assert_not_called()
+
+
+class MaxResolverTests(unittest.IsolatedAsyncioTestCase):
+    async def test_resolve_max_chat_keeps_numeric_ids_permissive(self) -> None:
+        bot = SimpleNamespace(
+            normalize_chat_link=lambda value: value,
+            get_chat=AsyncMock(),
+        )
+
+        display, chat_id = await resolve_max_chat(bot, "  42  ")
+
+        self.assertEqual(display, "42")
+        self.assertEqual(chat_id, 42)
+        bot.get_chat.assert_not_called()
+
+    async def test_resolve_max_chat_normalizes_links_before_lookup(self) -> None:
+        bot = SimpleNamespace(
+            normalize_chat_link=MaxBot.normalize_chat_link,
+            get_chat=AsyncMock(return_value=SimpleNamespace(chat_id=99)),
+        )
+
+        display, chat_id = await resolve_max_chat(bot, " max.ru/example/ ")
+
+        self.assertEqual(display, "https://max.ru/example")
+        self.assertEqual(chat_id, 99)
+        bot.get_chat.assert_awaited_once_with("https://max.ru/example")
+
+    async def test_resolve_max_chat_wraps_lookup_errors(self) -> None:
+        bot = SimpleNamespace(
+            normalize_chat_link=lambda value: f"https://{value.strip()}",
+            get_chat=AsyncMock(side_effect=LookupError("not found")),
+        )
+
+        with self.assertRaisesRegex(ResolveError, "Failed to resolve Max chat"):
+            await resolve_max_chat(bot, "max.ru/missing")
 
 
 if __name__ == "__main__":

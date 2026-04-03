@@ -4,12 +4,11 @@ import os
 import tempfile
 
 from aiogram.types import Message as TgMessage
-from maxapi.enums.parse_mode import ParseMode
-from maxapi.types import InputMedia
 
 import db
 from loader import tg_dp, tg_bot, max_bot
 from utils.formatting import format_message_for_max
+from utils.maxapi_compat import InputMedia, ParseMode
 
 media_groups = {}
 
