@@ -14,7 +14,12 @@ import config
 import db
 from loader import tg_dp, tg_bot, max_bot
 from utils.auth import admin_only, is_admin
-from utils.resolvers import resolve_tg_chat, resolve_max_chat, ResolveError
+from utils.resolvers import (
+    ResolveError,
+    resolve_max_chat,
+    resolve_tg_chat,
+    resolve_tg_forward_source,
+)
 
 
 HELP_TEXT = """Bot Admin Commands:
@@ -86,9 +91,19 @@ async def handle_add(message: TgMessage):
 
     _, tg_input, max_input = parts
 
+    try:
+        bot_user_id = (await tg_bot.get_me()).id
+    except Exception as e:
+        await message.reply(f"Failed to verify Telegram bot identity: {e}")
+        return
+
     # Resolve Telegram source
     try:
-        tg_display, tg_id = await resolve_tg_chat(tg_bot, tg_input)
+        tg_display, tg_id = await resolve_tg_forward_source(
+            tg_bot,
+            tg_input,
+            bot_user_id=bot_user_id,
+        )
     except ResolveError as e:
         await message.reply(f"Failed to resolve Telegram source: {e}")
         return
@@ -194,6 +209,12 @@ async def handle_import(message: TgMessage):
         await message.reply("CSV file is empty.")
         return
 
+    try:
+        bot_user_id = (await tg_bot.get_me()).id
+    except Exception as e:
+        await message.reply(f"Failed to verify Telegram bot identity: {e}")
+        return
+
     # Process rows
     success_count = 0
     duplicate_count = 0
@@ -209,7 +230,11 @@ async def handle_import(message: TgMessage):
 
         # Resolve Telegram source
         try:
-            tg_display, tg_id = await resolve_tg_chat(tg_bot, tg_input)
+            tg_display, tg_id = await resolve_tg_forward_source(
+                tg_bot,
+                tg_input,
+                bot_user_id=bot_user_id,
+            )
         except ResolveError as e:
             errors.append(f"Line {i}: {e}")
             continue
