@@ -3,8 +3,8 @@ u:
 
 c: coverage
 
-coverage:
-	.venv/bin/python -m pytest --cov=db --cov=handlers --cov=utils --cov-report=term-missing --cov-fail-under=$${COVERAGE_MIN:-90}
+t:
+	uv run pytest --cov=db --cov=handlers --cov=utils --cov-report=term-missing --cov-fail-under=$${COVERAGE_MIN:-90}
 
 b:
 	docker compose build

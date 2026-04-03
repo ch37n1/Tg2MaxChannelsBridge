@@ -1,6 +1,6 @@
-from maxapi import Dispatcher as MaxDispatcher
 from aiogram import Bot as TgBot, Dispatcher as TgDispatcher
 import config
+from utils.maxapi_compat import MaxDispatcher
 from utils.max_bot import MaxBot
 
 # Initialize Bots
