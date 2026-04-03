@@ -4,10 +4,12 @@ import os
 import tempfile
 
 from aiogram.types import Message as TgMessage
+from maxapi.enums.parse_mode import ParseMode
 from maxapi.types import InputMedia
 
 import db
 from loader import tg_dp, tg_bot, max_bot
+from utils.formatting import format_message_for_max
 
 media_groups = {}
 
@@ -49,7 +51,10 @@ async def download_tg_media(file_id: str, default_suffix: str = ".bin") -> str |
 
 
 async def send_to_max(
-    max_channel_id: int, text: str | None, temp_paths: list[str]
+    max_channel_id: int,
+    text: str | None,
+    temp_paths: list[str],
+    parse_mode: ParseMode | None = None,
 ) -> bool:
     """
     Send attachments to a Max channel and cleanup temp files.
@@ -70,6 +75,7 @@ async def send_to_max(
             chat_id=max_channel_id,
             text=text or "",
             attachments=attachments if attachments else None,
+            parse_mode=parse_mode,
         )
         return True
     except Exception as e:
@@ -106,10 +112,12 @@ async def forward_media_group(media_group_id: str, max_channel_id: int):
 
     # Ищем текст (подпись) - берем первую непустую
     text = ""
+    parse_mode = None
     for m in messages:
-        caption = m.caption or m.text
-        if caption:
-            text = caption
+        formatted = format_message_for_max(m)
+        if formatted.text:
+            text = formatted.text
+            parse_mode = formatted.parse_mode
             break
 
     # Download all media (photos and videos)
@@ -135,7 +143,12 @@ async def forward_media_group(media_group_id: str, max_channel_id: int):
         return
 
     # Send to Max (cleanup handled inside send_to_max)
-    success = await send_to_max(max_channel_id, text, temp_files)
+    success = await send_to_max(
+        max_channel_id,
+        text,
+        temp_files,
+        parse_mode=parse_mode,
+    )
     if success:
         logging.info(
             f"Forwarded media group {media_group_id} with {len(temp_files)} items to MAX"
@@ -178,14 +191,20 @@ async def handle_single(tg_message: TgMessage, max_channel_id: int):
         logging.debug("Skipping location message")
         return
 
-    text = tg_message.text or tg_message.caption or ""
+    formatted = format_message_for_max(tg_message)
+    text = formatted.text
 
     # Photo
     if tg_message.photo:
         photo = tg_message.photo[-1]  # Best quality
         temp_path = await download_tg_media(photo.file_id, default_suffix=".jpg")
         if temp_path:
-            await send_to_max(max_channel_id, text, [temp_path])
+            await send_to_max(
+                max_channel_id,
+                text,
+                [temp_path],
+                parse_mode=formatted.parse_mode,
+            )
             logging.info("Forwarded photo to MAX")
         return
 
@@ -195,7 +214,12 @@ async def handle_single(tg_message: TgMessage, max_channel_id: int):
             tg_message.audio.file_id, default_suffix=".mp3"
         )
         if temp_path:
-            await send_to_max(max_channel_id, text, [temp_path])
+            await send_to_max(
+                max_channel_id,
+                text,
+                [temp_path],
+                parse_mode=formatted.parse_mode,
+            )
             logging.info("Forwarded audio to MAX")
         return
 
@@ -205,7 +229,12 @@ async def handle_single(tg_message: TgMessage, max_channel_id: int):
             tg_message.document.file_id, default_suffix=".bin"
         )
         if temp_path:
-            await send_to_max(max_channel_id, text, [temp_path])
+            await send_to_max(
+                max_channel_id,
+                text,
+                [temp_path],
+                parse_mode=formatted.parse_mode,
+            )
             logging.info("Forwarded document to MAX")
         return
 
@@ -215,13 +244,23 @@ async def handle_single(tg_message: TgMessage, max_channel_id: int):
             tg_message.video.file_id, default_suffix=".mp4"
         )
         if temp_path:
-            await send_to_max(max_channel_id, text, [temp_path])
+            await send_to_max(
+                max_channel_id,
+                text,
+                [temp_path],
+                parse_mode=formatted.parse_mode,
+            )
             logging.info("Forwarded video to MAX")
         return
 
     # Text only
     if text:
-        await send_to_max(max_channel_id, text, [])
+        await send_to_max(
+            max_channel_id,
+            text,
+            [],
+            parse_mode=formatted.parse_mode,
+        )
         logging.info("Forwarded text to MAX")
 
 
