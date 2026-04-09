@@ -16,6 +16,26 @@ class FormattedText:
     parse_mode: ParseMode | None = None
 
 
+_OUTER_WHITESPACE_RE = re.compile(r"^(\s*)(.*?)(\s*)$", re.DOTALL)
+
+
+def _wrap_with_delimiters(
+    value: str,
+    opening: str,
+    closing: str | None = None,
+) -> str:
+    resolved_closing = closing or opening
+    match = _OUTER_WHITESPACE_RE.match(value)
+    if not match:
+        return f"{opening}{value}{resolved_closing}"
+
+    leading, core, trailing = match.groups()
+    if not core:
+        return value
+
+    return f"{leading}{opening}{core}{resolved_closing}{trailing}"
+
+
 class MaxMarkdownDecoration(TextDecoration):
     _ESCAPE_RE = re.compile(r"([\\*_`\[\]()~+])")
 
@@ -29,10 +49,10 @@ class MaxMarkdownDecoration(TextDecoration):
         return f"[{value}]({escaped_link})"
 
     def bold(self, value: str) -> str:
-        return f"**{value}**"
+        return _wrap_with_delimiters(value, "**")
 
     def italic(self, value: str) -> str:
-        return f"_{value}_"
+        return _wrap_with_delimiters(value, "_")
 
     def code(self, value: str) -> str:
         safe_value = value.replace("\\", "\\\\").replace("`", r"\`").replace("\n", " ")
@@ -46,10 +66,10 @@ class MaxMarkdownDecoration(TextDecoration):
         return value
 
     def underline(self, value: str) -> str:
-        return f"++{value}++"
+        return _wrap_with_delimiters(value, "++")
 
     def strikethrough(self, value: str) -> str:
-        return f"~~{value}~~"
+        return _wrap_with_delimiters(value, "~~")
 
     def spoiler(self, value: str) -> str:
         return value

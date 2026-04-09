@@ -84,6 +84,33 @@ class FormatTextForMaxTests(unittest.TestCase):
         self.assertEqual(formatted.text, "🙂 **bold**")
         self.assertEqual(formatted.parse_mode, ParseMode.MARKDOWN)
 
+    def test_bold_entity_moves_outer_spaces_outside_markers(self) -> None:
+        text = "start bold end"
+        entities = [make_entity(MessageEntityType.BOLD, text, " bold ")]
+
+        formatted = format_text_for_max(text, entities)
+
+        self.assertEqual(formatted.text, "start **bold** end")
+        self.assertEqual(formatted.parse_mode, ParseMode.MARKDOWN)
+
+    def test_bold_entity_with_trailing_space_before_paragraph_text(self) -> None:
+        text = "Разводов в стране – 34,8 тыс. Каждый четвертый брак"
+        entities = [
+            make_entity(
+                MessageEntityType.BOLD,
+                text,
+                "Разводов в стране – 34,8 тыс. ",
+            )
+        ]
+
+        formatted = format_text_for_max(text, entities)
+
+        self.assertEqual(
+            formatted.text,
+            "**Разводов в стране – 34,8 тыс.** Каждый четвертый брак",
+        )
+        self.assertEqual(formatted.parse_mode, ParseMode.MARKDOWN)
+
     def test_pre_entities_fall_back_to_html(self) -> None:
         text = "line 1\n<tag>"
         entities = [
